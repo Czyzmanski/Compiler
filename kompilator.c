@@ -1,14 +1,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <bool.h>
 
 #define GROWTH_FACTOR 2
 #define INITIAL_CAPACITY 2
 
-#define NUM_OF_PROC 27 
+#define NUM_OF_PROC 26 
 #define MISSING_VAL -1
 #define NO_VAL -2
+
+typedef enum {
+	false = 0,
+	true = 1
+} bool;
 
 typedef enum {
     PUSH_0 = 0,
@@ -34,7 +38,7 @@ command* get_new_command(opcode a, int b, int c){
 	comm->a = a;
 	comm->b = b;
 	comm->c = c;
-	return comm
+	return comm;
 }
 
 typedef struct {
@@ -58,7 +62,7 @@ void add_element(vector* v, command* elem){
 	if(v->size == v->capacity){
 		reallocate(v);
 	}
-	v->arr[size] = elem;
+	v->arr[v->size] = elem;
 	v->size++;
 }
 
@@ -101,16 +105,6 @@ int get_stack_number(int stack_name){
 	return stack_name - 'a';
 }
 
-int update_bracket_count(int c, int bracket_count){
-	if(c == '{'){
-		return bracket_count + 1;
-	} else if(c == '}'){
-		return bracket_count - 1;
-	} else {
-		return bracket_count;
-	}
-}
-
 void remove_comment(){
 	int c = getchar();
 	while(c != EOF && c != '\n'){
@@ -119,62 +113,110 @@ void remove_comment(){
 }
 
 void call_procedure(int proc_name, vector* commands){
-	command* comm = (command*) malloc(sizeof(command*));
-	comm->a = CALL;
-	comm->b = proc_name;
-	add_element(commands, comm);
+	command* call_comm = get_new_command(CALL, proc_name, NO_VAL);
+	add_element(commands, call_comm);
 }
 
 void push_bits_on_stack(int c, int stack_name, vector* commands){
 	do {
+		command* push_comm;
 		int stack_number = get_stack_number(stack_name);
-		command* comm = get_new_command(MISSING_VAL, stack_number, NO_VAL);
-		comm->a = c == '-' ? PUSH_0 : PUSH_1;
-		add_element(commands, comm);
+		
+		if(c == '-'){
+			push_comm = get_new_command(PUSH_0, stack_number, NO_VAL);
+		} else {
+			push_comm = get_new_command(PUSH_1, stack_number, NO_VAL);
+		}
+		
+		add_element(commands, push_comm);
+		
 		c = next();
 	} while(is_bit(c));
 }
 
-void read_block_definition(vector* commands);
+void read_block_definition(int c, vector* commands);
+
+void branch(int c, command* branch_comm, vector* commands){
+	read_block_definition(c, commands);
+	
+	command* jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
+	add_element(commands, jump_comm);
+	
+	branch_comm->b = commands->size;
+	
+	c = next();
+	read_block_definition(c, commands);
+	
+	jump_comm->b = commands->size;
+}
+
+void pop_branch(int c, int stack_name, vector* commands){
+	int stack_number = get_stack_number(stack_name);
+	
+	command* pop_branch_comm = get_new_command(POP_BRANCH, MISSING_VAL, stack_number);
+	add_element(commands, pop_branch_comm);
+	
+	branch(c, pop_branch_comm, commands);
+}
 
 void operate_on_stack(int stack_name, vector* commands){
 	int c = next();
 	if(is_bit(c)){
 		push_bits_on_stack(c, stack_name, commands);
 	} else {
-		int stack_number = get_stack_number(stack_name);
+		pop_branch(c, stack_name, commands);
+	}
+}
+
+void write_bits_to_output(int c, vector* commands){
+	do {
+		command* output_comm;
 		
-		command* pop_branch_comm = get_new_command(POP_BRANCH, MISSING_VAL, stack_number);
-		add_element(commands, pop_branch_comm);
+		if(c == '-'){
+			output_comm = get_new_command(OUTPUT_0, NO_VAL, NO_VAL);
+		} else {
+			output_comm = get_new_command(OUTPUT_1, NO_VAL, NO_VAL);
+		}
 		
-		read_block_definition(c, commands);
+		add_element(commands, output_comm);
 		
-		command* jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
-		add_element(commands, jump_comm);
-		
-		pop_branch_comm->b = commands->size;
-		
-		read_block_definition(c, commands);
-		
-		jump_comm->b = commands->size;
+		c = next();
+	} while(is_bit(c));
+}
+
+void input_branch(int c, vector* commands){
+	command* input_branch_comm = get_new_command(INPUT_BRANCH, MISSING_VAL, NO_VAL);
+	add_element(commands, input_branch_comm);
+	
+	branch(c, input_branch_comm, commands);
+}
+
+void operate_on_input(vector* commands){
+	int c = next();
+	if(is_bit(c)){
+		write_bits_to_output(c, commands);
+	} else {
+		input_branch(c, commands);
 	}
 }
 
 void read_block_definition(int c, vector* commands){
-	int bracket_count = 1;
-	
-	while(c != EOF && bracket_count > 0){
+	while(c != EOF && c != '}'){
 		c = next();
-		bracket_count = update_bracket_count(c, bracket_count);
 		if(is_uppercase_letter(c)){
-			call_procedure(proc_name, commands);
+			call_procedure(c, commands);
 		} else if(is_lowercase_letter(c)){
 			operate_on_stack(c, commands);
+		} else if(c == '$'){
+			operate_on_input(commands);
 		}
 	}
 }
 
 void read_program(vector* commands, int* proc_addr){
+	command* jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
+	add_element(commands, jump_comm);
+	
 	int c = next();
 	while(c != EOF){
 		if(c == ';'){
@@ -182,12 +224,63 @@ void read_program(vector* commands, int* proc_addr){
 		} else if(is_uppercase_letter(c)){
 			int key = get_proc_number(c);
 			proc_addr[key] = commands->size;
+			
 			c = next();
 			read_block_definition(c, commands);
+			
 			command* return_comm = get_new_command(RETURN, NO_VAL, NO_VAL);
 			add_element(commands, return_comm);
-		} 
+		} else if(c == '{'){
+			command* jump_comm = commands->arr[0];
+			jump_comm->b = commands->size;
+			
+			read_block_definition(c, commands);
+			
+			command* halt_comm = get_new_command(HALT, NO_VAL, NO_VAL);
+			add_element(commands, halt_comm);
+		}
 		c = next();
+	}
+}
+
+void update_call_commands(vector* commands, int* proc_addr){
+	for(int i = 0; i < commands->size; i++){
+		command* comm = commands->arr[i];
+		if(comm->a == CALL){
+			int proc_name = comm->b;
+			int proc_number = get_proc_number(proc_name);
+			comm->b = proc_addr[proc_number];
+		}
+	}
+}
+
+void print_command(command* comm){
+	switch(comm->a){
+		case PUSH_0:
+		case PUSH_1:
+			printf("%d %d", comm->a, comm->b);
+			break;
+		case OUTPUT_0:
+		case OUTPUT_1:
+		case RETURN:
+		case HALT:
+			printf("%d", comm->a);
+			break;
+		case POP_BRANCH:
+			printf("%d %d %d", comm->a, comm->b, comm->c);
+			break;
+		case INPUT_BRANCH:
+		case JUMP:
+		case CALL:
+			printf("%d %d", comm->a, comm->b);
+			break;
+	}
+	printf("\n");
+}
+
+void write_compiled_code(vector* commands){
+	for(int i = 0; i < commands->size; i++){
+		print_command(commands->arr[i]);
 	}
 }
 
@@ -201,7 +294,10 @@ int main(){
 	}
 	
 	read_program(&commands, proc_addr);
+	update_call_commands(&commands, proc_addr);
+	write_compiled_code(&commands);
 	
 	dispose(&commands);
+	
 	return 0;
 }
