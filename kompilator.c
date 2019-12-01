@@ -7,7 +7,8 @@
 #define INITIAL_CAPACITY 2
 
 #define NUM_OF_PROC 27 
-#define MISSING_ADDR -1
+#define MISSING_VAL -1
+#define NO_VAL -2
 
 typedef enum {
     PUSH_0 = 0,
@@ -27,6 +28,14 @@ typedef struct {
     int b;
     int c;
 } command;
+
+command* get_new_command(opcode a, int b, int c){
+	command* comm = (command*) malloc(sizeof(command*));
+	comm->a = a;
+	comm->b = b;
+	comm->c = c;
+	return comm
+}
 
 typedef struct {
 	command** arr;
@@ -118,28 +127,40 @@ void call_procedure(int proc_name, vector* commands){
 
 void push_bits_on_stack(int c, int stack_name, vector* commands){
 	do {
-		command* comm = malloc(sizeof(command*));
+		int stack_number = get_stack_number(stack_name);
+		command* comm = get_new_command(MISSING_VAL, stack_number, NO_VAL);
 		comm->a = c == '-' ? PUSH_0 : PUSH_1;
-		comm->b = get_stack_number(stack_name);
 		add_element(commands, comm);
 		c = next();
 	} while(is_bit(c));
 }
+
+void read_block_definition(vector* commands);
 
 void operate_on_stack(int stack_name, vector* commands){
 	int c = next();
 	if(is_bit(c)){
 		push_bits_on_stack(c, stack_name, commands);
 	} else {
-		// will be opcode 4
+		int stack_number = get_stack_number(stack_name);
+		
+		command* pop_branch_comm = get_new_command(POP_BRANCH, MISSING_VAL, stack_number);
+		add_element(commands, pop_branch_comm);
+		
+		read_block_definition(c, commands);
+		
+		command* jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
+		add_element(commands, jump_comm);
+		
+		pop_branch_comm->b = commands->size;
+		
+		read_block_definition(c, commands);
+		
+		jump_comm->b = commands->size;
 	}
 }
 
-void read_block_definition(int proc_name, vector* commands, int* proc_addr){
-	int key = get_proc_number(proc_name);
-	proc_addr[key] = commands->size;
-	
-	int c = next();
+void read_block_definition(int c, vector* commands){
 	int bracket_count = 1;
 	
 	while(c != EOF && bracket_count > 0){
@@ -159,7 +180,12 @@ void read_program(vector* commands, int* proc_addr){
 		if(c == ';'){
 			remove_comment();
 		} else if(is_uppercase_letter(c)){
-			read_block_definition(c, commands, proc_addr);
+			int key = get_proc_number(c);
+			proc_addr[key] = commands->size;
+			c = next();
+			read_block_definition(c, commands);
+			command* return_comm = get_new_command(RETURN, NO_VAL, NO_VAL);
+			add_element(commands, return_comm);
 		} 
 		c = next();
 	}
@@ -171,7 +197,7 @@ int main(){
 	
 	int proc_addr[NUM_OF_PROC];
 	for(int i = 0; i < NUM_OF_PROC; i++){
-		proc_addr[i] = MISSING_ADDR;
+		proc_addr[i] = MISSING_VAL;
 	}
 	
 	read_program(&commands, proc_addr);
