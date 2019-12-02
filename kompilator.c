@@ -74,26 +74,28 @@ void dispose(vector* v){
 }
 
 bool is_uppercase_letter(int c){
-	return ('A' <= c && c <= 'Z');
+	return 'A' <= c && c <= 'Z';
 }
 
 bool is_lowercase_letter(int c){
-	return ('a' <= c && c <= 'z');
+	return 'a' <= c && c <= 'z';
 }
 
 bool is_whitespace_character(int c){
-	return (c == ' ' || c == '\t' || c == '\n');
+	return c == ' ' || c == '\t' || c == '\n';
 }
 
 bool is_bit(int c){
-	return (c == '-' || c == '+');
+	return c == '-' || c == '+';
 }
 
 int next(){
 	int c = getchar();
+	
 	while(is_whitespace_character(c)){
 		c = getchar();
 	}
+	
 	return c;
 }
 
@@ -105,11 +107,14 @@ int get_stack_number(int stack_name){
 	return stack_name - 'a';
 }
 
-void remove_comment(){
+int remove_comment(){
 	int c = getchar();
+	
 	while(c != EOF && c != '\n'){
 		c = getchar();
 	}
+	
+	return c;
 }
 
 void call_procedure(int proc_name, vector* commands){
@@ -117,7 +122,7 @@ void call_procedure(int proc_name, vector* commands){
 	add_element(commands, call_comm);
 }
 
-void push_bits_on_stack(int c, int stack_name, vector* commands){
+int push_bits_on_stack(int c, int stack_name, vector* commands){
 	do {
 		command* push_comm;
 		int stack_number = get_stack_number(stack_name);
@@ -132,12 +137,14 @@ void push_bits_on_stack(int c, int stack_name, vector* commands){
 		
 		c = next();
 	} while(is_bit(c));
+	
+	return c;
 }
 
-void read_block_definition(int c, vector* commands);
+int read_block_definition(int c, vector* commands);
 
-void branch(int c, command* branch_comm, vector* commands){
-	read_block_definition(c, commands);
+int branch(int c, command* branch_comm, vector* commands){
+	c = read_block_definition(c, commands);
 	
 	command* jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
 	add_element(commands, jump_comm);
@@ -145,30 +152,38 @@ void branch(int c, command* branch_comm, vector* commands){
 	branch_comm->b = commands->size;
 	
 	c = next();
-	read_block_definition(c, commands);
+	c = read_block_definition(c, commands);
 	
 	jump_comm->b = commands->size;
+	
+	return c;
 }
 
-void pop_branch(int c, int stack_name, vector* commands){
+int pop_branch(int c, int stack_name, vector* commands){
 	int stack_number = get_stack_number(stack_name);
 	
 	command* pop_branch_comm = get_new_command(POP_BRANCH, MISSING_VAL, stack_number);
 	add_element(commands, pop_branch_comm);
 	
-	branch(c, pop_branch_comm, commands);
+	c = branch(c, pop_branch_comm, commands);
+	
+	return c;
 }
 
-void operate_on_stack(int stack_name, vector* commands){
+int operate_on_stack(int stack_name, vector* commands){
 	int c = next();
+	
 	if(is_bit(c)){
-		push_bits_on_stack(c, stack_name, commands);
+		c = push_bits_on_stack(c, stack_name, commands);
 	} else {
-		pop_branch(c, stack_name, commands);
+		c = pop_branch(c, stack_name, commands);
+		c = next();
 	}
+	
+	return c;
 }
 
-void write_bits_to_output(int c, vector* commands){
+int write_bits_to_output(int c, vector* commands){
 	do {
 		command* output_comm;
 		
@@ -182,35 +197,47 @@ void write_bits_to_output(int c, vector* commands){
 		
 		c = next();
 	} while(is_bit(c));
+	
+	return c;
 }
 
-void input_branch(int c, vector* commands){
+int input_branch(int c, vector* commands){
 	command* input_branch_comm = get_new_command(INPUT_BRANCH, MISSING_VAL, NO_VAL);
 	add_element(commands, input_branch_comm);
 	
-	branch(c, input_branch_comm, commands);
+	c = branch(c, input_branch_comm, commands);
+	
+	return c;
 }
 
-void operate_on_input(vector* commands){
+int operate_on_input(vector* commands){
 	int c = next();
+	
 	if(is_bit(c)){
-		write_bits_to_output(c, commands);
+		c = write_bits_to_output(c, commands);
 	} else {
-		input_branch(c, commands);
+		c = input_branch(c, commands);
+		c = next();
 	}
+	
+	return c;
 }
 
-void read_block_definition(int c, vector* commands){
+int read_block_definition(int c, vector* commands){
+	c = next(); // stops at first not-whitespace character inside current block
+	
 	while(c != EOF && c != '}'){
-		c = next();
 		if(is_uppercase_letter(c)){
 			call_procedure(c, commands);
+			c = next();
 		} else if(is_lowercase_letter(c)){
-			operate_on_stack(c, commands);
+			c = operate_on_stack(c, commands);
 		} else if(c == '$'){
-			operate_on_input(commands);
+			c = operate_on_input(commands);
 		}
 	}
+	
+	return c;
 }
 
 void read_program(vector* commands, int* proc_addr){
@@ -220,13 +247,13 @@ void read_program(vector* commands, int* proc_addr){
 	int c = next();
 	while(c != EOF){
 		if(c == ';'){
-			remove_comment();
+			c = remove_comment();
 		} else if(is_uppercase_letter(c)){
 			int key = get_proc_number(c);
 			proc_addr[key] = commands->size;
 			
 			c = next();
-			read_block_definition(c, commands);
+			c = read_block_definition(c, commands);
 			
 			command* return_comm = get_new_command(RETURN, NO_VAL, NO_VAL);
 			add_element(commands, return_comm);
@@ -234,12 +261,15 @@ void read_program(vector* commands, int* proc_addr){
 			command* jump_comm = commands->arr[0];
 			jump_comm->b = commands->size;
 			
-			read_block_definition(c, commands);
+			c = read_block_definition(c, commands);
 			
 			command* halt_comm = get_new_command(HALT, NO_VAL, NO_VAL);
 			add_element(commands, halt_comm);
 		}
-		c = next();
+		
+		if(c != EOF){
+			c = next();
+		}
 	}
 }
 
