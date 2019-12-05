@@ -34,7 +34,7 @@ typedef struct {
 } command;
 
 command* get_new_command(opcode a, int b, int c){
-	command* comm = (command*) malloc(sizeof(command*));
+	command* comm = (command*) malloc(sizeof(command));
 	comm->a = a;
 	comm->b = b;
 	comm->c = c;
