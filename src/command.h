@@ -2,6 +2,7 @@
 #define COMMAND_H
 
 #include <stdlib.h>
+#include <assert.h>
 
 #define MISSING_VAL -1
 #define NO_VAL -2
@@ -33,9 +34,12 @@ void print_command(command_t *comm);
 
 static inline command_t *get_new_command(opcode_t a, int b, int c) {
     command_t *comm = malloc(sizeof(command_t));
+    assert(comm != NULL);
+
     comm->a = a;
     comm->b = b;
     comm->c = c;
+
     return comm;
 }
 
