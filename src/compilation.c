@@ -30,7 +30,7 @@ static inline int get_procedure_number(int proc_name) {
 static inline int next() {
     int c = getchar();
 
-    while (isspace(c)) {
+    while (c != EOF && isspace(c)) {
         c = getchar();
     }
 
@@ -47,12 +47,26 @@ static inline int skip_comment() {
     return c;
 }
 
+static inline int check_for_comment(int c) {
+    while (c == COMMENT_BEGINNING) {
+        c = skip_comment();
+
+        if (c != EOF) {
+            c = next();
+        }
+    }
+
+    return c;
+}
+
 static inline void call_procedure(int proc_name, vector_t *commands) {
     command_t *call_comm = get_new_command(CALL, proc_name, NO_VAL);
     add_element(commands, call_comm);
 }
 
 static int push_bits_on_stack(int c, int stack_name, vector_t *commands) {
+    c = check_for_comment(c);
+
     do {
         command_t *push_comm;
         int stack_number = get_stack_number(stack_name);
@@ -83,6 +97,7 @@ static int branch(int c, command_t *branch_comm, vector_t *commands) {
     branch_comm->b = commands->size;
 
     c = next();
+    c = check_for_comment(c);
     c = read_block_definition(c, commands);
 
     jump_comm->b = commands->size;
@@ -102,18 +117,27 @@ static inline void pop_branch(int c, int stack_name, vector_t *commands) {
 static int operate_on_stack(int stack_name, vector_t *commands) {
     int c = next();
 
-    if (is_bit(c)) {
-        c = push_bits_on_stack(c, stack_name, commands);
-    }
-    else {
-        pop_branch(c, stack_name, commands);
-        c = next();
+    while (c != EOF && (is_bit(c) || c == COMMENT_BEGINNING)) {
+        c = check_for_comment(c);
+
+        if (is_bit(c)) {
+            c = push_bits_on_stack(c, stack_name, commands);
+        }
+        else if (c == COMMENT_BEGINNING) {
+            c = check_for_comment(c);
+        }
+        else if (c == BLOCK_BEGINNING) {
+            pop_branch(c, stack_name, commands);
+            c = next();
+        }
     }
 
     return c;
 }
 
 static int write_bits_to_output(int c, vector_t *commands) {
+    c = check_for_comment(c);
+
     do {
         command_t *output_comm;
 
@@ -142,12 +166,19 @@ static inline void input_branch(int c, vector_t *commands) {
 static int operate_on_output(vector_t *commands) {
     int c = next();
 
-    if (is_bit(c)) {
-        c = write_bits_to_output(c, commands);
-    }
-    else {
-        input_branch(c, commands);
-        c = next();
+    while (c != EOF && (is_bit(c) || c == COMMENT_BEGINNING)) {
+        c = check_for_comment(c);
+
+        if (is_bit(c)) {
+            c = write_bits_to_output(c, commands);
+        }
+        else if (c == COMMENT_BEGINNING) {
+            c = check_for_comment(c);
+        }
+        else if (c == BLOCK_BEGINNING) {
+            input_branch(c, commands);
+            c = next();
+        }
     }
 
     return c;
@@ -166,6 +197,9 @@ static int read_block_definition(int c, vector_t *commands) {
         }
         else if (c == SPECIAL_NAME) {
             c = operate_on_output(commands);
+        }
+        else {
+            c = check_for_comment(c);
         }
     }
 
@@ -196,6 +230,7 @@ void compile_program(vector_t *commands, int *proc_addr) {
             proc_addr[key] = commands->size;
 
             c = next();
+            c = check_for_comment(c);
             c = read_block_definition(c, commands);
 
             command_t *return_comm = get_new_command(RETURN, NO_VAL, NO_VAL);
