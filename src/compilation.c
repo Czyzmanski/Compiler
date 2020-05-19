@@ -94,13 +94,13 @@ static int branch(int c, command_t *branch_comm, vector_t *commands) {
     command_t *jump_comm = get_new_command(JUMP, MISSING_VAL, NO_VAL);
     add_element(commands, jump_comm);
 
-    branch_comm->b = commands->size;
+    branch_comm->address = commands->size;
 
     c = next();
     c = check_for_comment(c);
     c = read_block_definition(c, commands);
 
-    jump_comm->b = commands->size;
+    jump_comm->address = commands->size;
 
     return c;
 }
@@ -209,10 +209,10 @@ static int read_block_definition(int c, vector_t *commands) {
 void update_call_commands(vector_t *commands, const int proc_addr[NUM_OF_PROC]) {
     for (int i = 0; i < commands->size; i++) {
         command_t *comm = commands->arr[i];
-        if (comm->a == CALL) {
-            int proc_name = comm->b;
+        if (comm->opcode == CALL) {
+            int proc_name = comm->address;
             int proc_number = get_procedure_number(proc_name);
-            comm->b = proc_addr[proc_number];
+            comm->address = proc_addr[proc_number];
         }
     }
 }
@@ -238,7 +238,7 @@ void compile_program(vector_t *commands, int *proc_addr) {
         }
         else if (c == BLOCK_BEGINNING) {
             command_t *jump_comm = commands->arr[0];
-            jump_comm->b = commands->size;
+            jump_comm->address = commands->size;
 
             c = read_block_definition(c, commands);
 

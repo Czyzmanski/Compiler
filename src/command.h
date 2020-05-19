@@ -23,9 +23,9 @@ enum opcode {
 typedef enum opcode opcode_t;
 
 struct command {
-    opcode_t a;
-    int b;
-    int c;
+    opcode_t opcode;
+    int address;
+    int stack;
 };
 
 typedef struct command command_t;
@@ -36,9 +36,9 @@ static inline command_t *get_new_command(opcode_t a, int b, int c) {
     command_t *comm = malloc(sizeof(command_t));
     assert(comm != NULL);
 
-    comm->a = a;
-    comm->b = b;
-    comm->c = c;
+    comm->opcode = a;
+    comm->address = b;
+    comm->stack = c;
 
     return comm;
 }
