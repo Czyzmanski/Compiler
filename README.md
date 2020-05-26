@@ -23,4 +23,4 @@ and compiles it into code that can be interpreted by virtual machine.
     Source → StackName | SpecialName
 
 There can also occur whitespace characters and comments from `;` character to the end of the line in the source code of
-opcode program written in the programming language derivable from above grammar. They does not affect semantics of the program.
+opcode program written in the programming language derivable from above grammar. They do not affect semantics of the program.
