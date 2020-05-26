@@ -1,6 +1,6 @@
 # Compiler
-Compiler reads code written in specific programming language, derivable from the following context-free grammar, 
-and compiles it into code that can be interpreted by virtual machine.
+The compiler reads code written in a specific programming language, derivable from the following context-free grammar, 
+and compiles it into code that can be interpreted by a virtual machine.
 
     Program → Procedures MainProcedure
     MainProcedure → ProcedureDefinition
